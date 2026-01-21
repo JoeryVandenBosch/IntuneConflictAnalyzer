@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intune Policy Conflict Analyzer</title>
+    <meta name="description" content="Analyze and resolve Microsoft Intune policy conflicts">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #0d1117;
+            --bg-tertiary: #151b23;
+            --bg-elevated: #1c232d;
+            --border-primary: #2d3748;
+            --border-secondary: #3d4a5c;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #0078d4;
+            --accent-blue-hover: #1a86d9;
+            --accent-cyan: #00d4aa;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            --accent-green: #22c55e;
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 40px rgba(0, 120, 212, 0.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-secondary); border-radius: 4px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .app-container { min-height: 100vh; display: flex; flex-direction: column; }
+        .header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-bottom: 1px solid var(--border-primary);
+            padding: 1.25rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-content { max-width: 1600px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .logo-section { display: flex; align-items: center; gap: 1rem; }
+        .logo-icon {
+            width: 42px; height: 42px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: var(--shadow-glow);
+        }
+        .logo-text h1 { font-size: 1.25rem; font-weight: 600; }
+        .logo-text span { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; }
+        .header-actions { display: flex; align-items: center; gap: 1rem; }
+        .user-badge {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+        .user-avatar {
+            width: 28px; height: 28px;
+            background: var(--accent-purple);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 0.75rem;
+        }
+        .main-content { flex: 1; max-width: 1600px; margin: 0 auto; padding: 2rem; width: 100%; }
+        .center-container { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 200px); }
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            padding: 2.5rem;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: var(--shadow-lg);
+        }
+        .card-icon {
+            width: 72px; height: 72px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            border-radius: 18px;
+            margin: 0 auto 1.5rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .card h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; text-align: center; }
+        .card p { color: var(--text-secondary); margin-bottom: 1.5rem; text-align: center; }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-secondary); }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+        .form-input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(0,120,212,0.15); }
+        .form-input::placeholder { color: var(--text-muted); font-family: 'IBM Plex Sans', sans-serif; }
+        .form-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.375rem; }
+        .form-error { color: var(--accent-red); font-size: 0.8125rem; margin-top: 0.5rem; padding: 0.75rem; background: rgba(239,68,68,0.1); border-radius: 6px; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        .btn-primary { background: var(--accent-blue); color: white; }
+        .btn-primary:hover { background: var(--accent-blue-hover); transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-primary); }
+        .btn-secondary:hover { background: var(--bg-elevated); }
+        .btn-danger { background: rgba(239,68,68,0.1); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-block { width: 100%; }
+        .btn-large { padding: 1rem 2rem; font-size: 1rem; }
+        .btn-icon { padding: 0.5rem; min-width: auto; }
+        .divider { display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0; color: var(--text-muted); font-size: 0.8125rem; }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-primary); }
+        .help-section {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+        }
+        .help-section h4 { font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary); }
+        .help-section ol { margin-left: 1.25rem; font-size: 0.8125rem; color: var(--text-muted); }
+        .help-section li { margin-bottom: 0.375rem; }
+        .help-section a { color: var(--accent-blue); text-decoration: none; }
+        .help-section a:hover { text-decoration: underline; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.2s;
+        }
+        .stat-card:hover { border-color: var(--border-secondary); transform: translateY(-2px); }
+        .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .stat-value { font-size: 2rem; font-weight: 600; line-height: 1; }
+        .stat-value.conflicts { color: var(--accent-red); }
+        .stat-value.policies { color: var(--accent-blue); }
+        .stat-value.clean { color: var(--accent-green); }
+        .dashboard-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .dashboard-title h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .dashboard-title p { color: var(--text-secondary); }
+        .dashboard-actions { display: flex; gap: 0.75rem; }
+        .tabs { display: flex; gap: 0.25rem; background: var(--bg-secondary); padding: 0.25rem; border-radius: 10px; border: 1px solid var(--border-primary); overflow-x: auto; margin-bottom: 1.5rem; }
+        .tab {
+            padding: 0.625rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            background: transparent;
+            border: none;
+            font-family: inherit;
+        }
+        .tab:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+        .tab.active { background: var(--accent-blue); color: white; }
+        .tab-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 20px; height: 20px; padding: 0 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+        .tab:not(.active) .tab-badge { background: var(--bg-elevated); }
+        .tab-badge.conflicts { background: var(--accent-red); color: white; }
+        .filter-bar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .search-wrapper { position: relative; flex: 1; min-width: 250px; }
+        .search-icon { position: absolute; left: 0.875rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+        .search-input {
+            width: 100%;
+            padding: 0.625rem 1rem 0.625rem 2.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+        .search-input:focus { outline: none; border-color: var(--accent-blue); }
+        .filter-select {
+            padding: 0.625rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+        .conflicts-list { display: flex; flex-direction: column; gap: 1rem; }
+        .conflict-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .conflict-card.severity-high { border-left: 4px solid var(--accent-red); }
+        .conflict-card.severity-medium { border-left: 4px solid var(--accent-orange); }
+        .conflict-card.severity-low { border-left: 4px solid var(--accent-yellow); }
+        .conflict-header { padding: 1rem 1.25rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; cursor: pointer; }
+        .conflict-header:hover { background: var(--bg-tertiary); }
+        .conflict-info { flex: 1; }
+        .conflict-title { font-weight: 600; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .conflict-setting {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--accent-cyan);
+            background: var(--bg-primary);
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+        }
+        .conflict-meta { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.8125rem; color: var(--text-secondary); }
+        .conflict-meta-item { display: flex; align-items: center; gap: 0.375rem; }
+        .severity-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .severity-badge.high { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+        .severity-badge.medium { background: rgba(249,115,22,0.15); color: var(--accent-orange); }
+        .severity-badge.low { background: rgba(234,179,8,0.15); color: var(--accent-yellow); }
+        .conflict-expand-icon { color: var(--text-muted); transition: transform 0.2s; }
+        .conflict-card.expanded .conflict-expand-icon { transform: rotate(180deg); }
+        .conflict-details { padding: 0 1.25rem 1.25rem; border-top: 1px solid var(--border-primary); }
+        .conflict-details-inner { padding-top: 1.25rem; }
+        .policy-comparison { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+        .policy-item { background: var(--bg-primary); border: 1px solid var(--border-primary); border-radius: 8px; padding: 1rem; }
+        .policy-item-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; font-weight: 500; }
+        .policy-type-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; }
+        .policy-type-icon.sc { background: var(--accent-blue); }
+        .policy-type-icon.dc { background: var(--accent-purple); }
+        .policy-type-icon.es { background: var(--accent-red); }
+        .policy-type-icon.cp { background: var(--accent-green); }
+        .policy-type-icon.at { background: #6366f1; }
+        .policy-type-icon.ps { background: var(--accent-cyan); }
+        .policy-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8125rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            word-break: break-all;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .policy-assignments { font-size: 0.8125rem; color: var(--text-secondary); }
+        .assignment-tag {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            margin: 0.25rem 0.25rem 0 0;
+            font-size: 0.75rem;
+        }
+        .resolution-section {
+            background: rgba(34,197,94,0.08);
+            border: 1px solid rgba(34,197,94,0.2);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .resolution-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--accent-green); margin-bottom: 0.75rem; }
+        .resolution-steps { font-size: 0.875rem; color: var(--text-secondary); }
+        .resolution-steps ol { margin-left: 1.25rem; }
+        .resolution-steps li { margin-bottom: 0.5rem; }
+        .policy-table { background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 12px; overflow: hidden; }
+        .policy-table-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 100px;
+            gap: 1rem;
+            padding: 0.875rem 1.25rem;
+            background: var(--bg-tertiary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .policy-table-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 100px;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--border-primary);
+            font-size: 0.875rem;
+        }
+        .policy-table-row:hover { background: var(--bg-tertiary); }
+        .policy-name { font-weight: 500; display: flex; align-items: center; gap: 0.75rem; }
+        .policy-status { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 6px; font-size: 0.75rem; font-weight: 500; }
+        .policy-status.has-conflicts { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+        .policy-status.clean { background: rgba(34,197,94,0.15); color: var(--accent-green); }
+        .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 2rem; text-align: center; }
+        .loading-spinner { width: 48px; height: 48px; border: 3px solid var(--border-secondary); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1.5rem; }
+        .progress-bar { height: 4px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden; margin: 1rem 0 0.5rem; max-width: 400px; width: 100%; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-cyan) 100%); transition: width 0.3s; }
+        .progress-text { font-size: 0.8125rem; color: var(--text-secondary); }
+        .empty-state { display: flex; flex-direction: column; align-items: center; padding: 4rem 2rem; text-align: center; }
+        .empty-icon { width: 80px; height: 80px; background: var(--bg-tertiary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 1.5rem; }
+        .empty-state h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .empty-state p { color: var(--text-secondary); max-width: 400px; }
+        .toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 1000; display: flex; flex-direction: column; gap: 0.75rem; }
+        .toast {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-secondary);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            animation: slideIn 0.3s ease-out;
+            min-width: 300px;
+        }
+        .toast.success { border-color: var(--accent-green); }
+        .toast.error { border-color: var(--accent-red); }
+        .toast-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+        .toast.success .toast-icon { background: var(--accent-green); }
+        .toast.error .toast-icon { background: var(--accent-red); }
+        .config-saved { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; color: var(--accent-green); font-size: 0.875rem; margin-bottom: 1.5rem; }
+        @media (max-width: 768px) {
+            .header { padding: 1rem; }
+            .main-content { padding: 1rem; }
+            .card { padding: 1.5rem; }
+            .policy-table-header, .policy-table-row { grid-template-columns: 1fr; gap: 0.5rem; }
+            .policy-table-header > *:not(:first-child) { display: none; }
+            .policy-comparison { grid-template-columns: 1fr; }
+            .dashboard-header { flex-direction: column; align-items: stretch; }
+            .dashboard-actions { width: 100%; }
+            .dashboard-actions .btn { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // Icons
+        const Icons = {
+            Shield: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+            Settings: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m16.5-5.5l-4.24 4.24m-4.52 4.52L4.5 17.5m13 0l-4.24-4.24m-4.52-4.52L4.5 4.5"/></svg>,
+            Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>,
+            AlertTriangle: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+            ChevronDown: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>,
+            RefreshCw: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>,
+            Search: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+            LogOut: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+            Lightbulb: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 019 14"/></svg>,
+            Users: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>,
+            Layers: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+            Download: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+            ExternalLink: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+            Microsoft: () => <svg width="20" height="20" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+        };
+
+        // Configuration storage
+        const CONFIG_KEY = 'intune_analyzer_config';
+        const getStoredConfig = () => {
+            try {
+                return JSON.parse(localStorage.getItem(CONFIG_KEY)) || null;
+            } catch { return null; }
+        };
+        const saveConfig = (config) => localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        const clearConfig = () => localStorage.removeItem(CONFIG_KEY);
+
+        // Policy Types
+        const POLICY_TYPES = {
+            settingsCatalog: { name: 'Settings Catalog', endpoint: '/deviceManagement/configurationPolicies', settingsEndpoint: (id) => `/deviceManagement/configurationPolicies/${id}/settings`, assignmentsEndpoint: (id) => `/deviceManagement/configurationPolicies/${id}/assignments`, icon: 'sc' },
+            deviceConfiguration: { name: 'Device Configuration', endpoint: '/deviceManagement/deviceConfigurations', assignmentsEndpoint: (id) => `/deviceManagement/deviceConfigurations/${id}/assignments`, icon: 'dc' },
+            endpointSecurity: { name: 'Endpoint Security', endpoint: '/deviceManagement/intents', settingsEndpoint: (id) => `/deviceManagement/intents/${id}/settings`, assignmentsEndpoint: (id) => `/deviceManagement/intents/${id}/assignments`, icon: 'es' },
+            compliance: { name: 'Compliance', endpoint: '/deviceManagement/deviceCompliancePolicies', assignmentsEndpoint: (id) => `/deviceManagement/deviceCompliancePolicies/${id}/assignments`, icon: 'cp' },
+            adminTemplates: { name: 'Admin Templates', endpoint: '/deviceManagement/groupPolicyConfigurations', valuesEndpoint: (id) => `/deviceManagement/groupPolicyConfigurations/${id}/definitionValues`, assignmentsEndpoint: (id) => `/deviceManagement/groupPolicyConfigurations/${id}/assignments`, icon: 'at' },
+            scripts: { name: 'Scripts', endpoint: '/deviceManagement/deviceManagementScripts', assignmentsEndpoint: (id) => `/deviceManagement/deviceManagementScripts/${id}/assignments`, icon: 'ps' }
+        };
+
+        // Conflict analysis
+        const analyzeConflicts = (allPolicies, assignments, settings) => {
+            const conflicts = [];
+            const settingsMap = new Map();
+
+            Object.entries(allPolicies).forEach(([policyType, policies]) => {
+                policies.forEach(policy => {
+                    const policySettings = settings[policy.id] || [];
+                    const policyAssignments = assignments[policy.id] || [];
+                    const assignedGroups = policyAssignments.map(a => a.target?.groupId || a.target?.['@odata.type'] || 'All Devices');
+
+                    if (policyType === 'settingsCatalog') {
+                        policySettings.forEach(setting => {
+                            const def = setting.settingInstance;
+                            if (!def) return;
+                            const settingId = def.settingDefinitionId || def['@odata.type'];
+                            const value = def.choiceSettingValue?.value || def.simpleSettingValue?.value || def.value;
+                            if (!settingsMap.has(settingId)) settingsMap.set(settingId, []);
+                            settingsMap.get(settingId).push({ policy, policyType, settingName: settingId, value, valueDisplay: formatValue(value), assignedGroups });
+                        });
+                    }
+                    if (policyType === 'deviceConfiguration') {
+                        const skip = ['id','displayName','description','version','createdDateTime','lastModifiedDateTime','@odata.type','roleScopeTagIds','supportsScopeTags'];
+                        Object.entries(policy).forEach(([key, value]) => {
+                            if (!skip.includes(key) && value !== null && value !== undefined) {
+                                const settingId = `dc:${key}`;
+                                if (!settingsMap.has(settingId)) settingsMap.set(settingId, []);
+                                settingsMap.get(settingId).push({ policy, policyType, settingName: key, value, valueDisplay: formatValue(value), assignedGroups });
+                            }
+                        });
+                    }
+                });
+            });
+
+            settingsMap.forEach((instances, settingId) => {
+                if (instances.length < 2) return;
+                const values = new Map();
+                instances.forEach(i => {
+                    const k = JSON.stringify(i.value);
+                    if (!values.has(k)) values.set(k, []);
+                    values.get(k).push(i);
+                });
+                if (values.size > 1) {
+                    const all = Array.from(values.values()).flat();
+                    const types = new Set(all.map(i => i.policyType));
+                    const name = all[0].settingName;
+                    const severity = types.size > 1 || ['firewall','bitlocker','defender','password','encryption'].some(k => name.toLowerCase().includes(k)) ? 'high' : 'medium';
+                    conflicts.push({
+                        id: settingId,
+                        settingName: cleanName(name),
+                        instances: all,
+                        severity,
+                        resolution: [
+                            'Consolidate this setting into a single policy (preferably Settings Catalog)',
+                            'Review assignment groups for overlap',
+                            `Consider using value "${all[0].valueDisplay}" from "${all[0].policy.displayName}"`
+                        ]
+                    });
+                }
+            });
+
+            return conflicts.sort((a,b) => ({high:0,medium:1,low:2}[a.severity] - {high:0,medium:1,low:2}[b.severity]));
+        };
+
+        const formatValue = (v) => {
+            if (v === null || v === undefined) return 'Not configured';
+            if (typeof v === 'boolean') return v ? 'Enabled' : 'Disabled';
+            if (typeof v === 'object') return JSON.stringify(v);
+            return String(v);
+        };
+
+        const cleanName = (name) => {
+            if (!name) return 'Unknown';
+            const parts = name.split('_');
+            return parts.length > 2 ? parts.slice(-2).join(' ').replace(/([A-Z])/g, ' $1').trim() : name.replace(/([A-Z])/g, ' $1').trim();
+        };
+
+        // Components
+        const Header = ({ user, onLogout, onSettings, showSettings }) => (
+            <header className="header">
+                <div className="header-content">
+                    <div className="logo-section">
+                        <div className="logo-icon"><Icons.Shield /></div>
+                        <div className="logo-text"><h1>Intune Policy Conflict Analyzer</h1><span>by intunestuff.com</span></div>
+                    </div>
+                    <div className="header-actions">
+                        {user && (
+                            <>
+                                <div className="user-badge">
+                                    <div className="user-avatar">{(user.name || user.username || 'U')[0].toUpperCase()}</div>
+                                    <span>{user.name || user.username}</span>
+                                </div>
+                                {showSettings && <button className="btn btn-secondary btn-icon" onClick={onSettings} title="Settings"><Icons.Settings /></button>}
+                                <button className="btn btn-secondary btn-icon" onClick={onLogout} title="Sign out"><Icons.LogOut /></button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </header>
+        );
+
+        const ConfigScreen = ({ onSave, existingConfig }) => {
+            const [tenantId, setTenantId] = useState(existingConfig?.tenantId || '');
+            const [clientId, setClientId] = useState(existingConfig?.clientId || '');
+            const [error, setError] = useState('');
+            const [saved, setSaved] = useState(!!existingConfig);
+
+            const validateGuid = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+            const handleSave = () => {
+                setError('');
+                if (!validateGuid(tenantId)) { setError('Invalid Tenant ID format. It should be a GUID like: 12345678-abcd-1234-efgh-123456789abc'); return; }
+                if (!validateGuid(clientId)) { setError('Invalid Client ID format. It should be a GUID like: 12345678-abcd-1234-efgh-123456789abc'); return; }
+                const config = { tenantId: tenantId.trim(), clientId: clientId.trim() };
+                saveConfig(config);
+                setSaved(true);
+                onSave(config);
+            };
+
+            return (
+                <div className="center-container">
+                    <div className="card fade-in">
+                        <div className="card-icon"><Icons.Shield /></div>
+                        <h2>Configure App Registration</h2>
+                        <p>Enter your Azure App Registration details to connect to Microsoft Graph.</p>
+
+                        {saved && <div className="config-saved"><Icons.Check /> Configuration saved</div>}
+                        {error && <div className="form-error">{error}</div>}
+
+                        <div className="form-group">
+                            <label className="form-label">Tenant ID (Directory ID)</label>
+                            <input type="text" className="form-input" placeholder="12345678-abcd-1234-efgh-123456789abc" value={tenantId} onChange={(e) => setTenantId(e.target.value)} />
+                            <div className="form-hint">Found in Azure Portal → App registrations → Your app → Overview</div>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Client ID (Application ID)</label>
+                            <input type="text" className="form-input" placeholder="87654321-dcba-4321-hgfe-987654321cba" value={clientId} onChange={(e) => setClientId(e.target.value)} />
+                            <div className="form-hint">Found in Azure Portal → App registrations → Your app → Overview</div>
+                        </div>
+
+                        <button className="btn btn-primary btn-block btn-large" onClick={handleSave}>Save Configuration</button>
+
+                        <div className="help-section">
+                            <h4>Need help setting this up?</h4>
+                            <ol>
+                                <li>Go to <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener">Azure App Registrations <Icons.ExternalLink /></a></li>
+                                <li>Create a new registration or select existing</li>
+                                <li>Copy the Tenant ID and Client ID from the Overview page</li>
+                                <li>Add <code>{window.location.origin}</code> as a Redirect URI under Authentication (SPA type)</li>
+                                <li>Grant required API permissions under API Permissions</li>
+                            </ol>
+                            <p style={{marginTop: '0.75rem'}}><a href="./SETUP-GUIDE.md" target="_blank">📖 View full setup guide</a></p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const LoginScreen = ({ config, onLogin, error, isLoading }) => (
+            <div className="center-container">
+                <div className="card fade-in">
+                    <div className="card-icon"><Icons.Shield /></div>
+                    <h2>Sign In to Analyze Policies</h2>
+                    <p>Authenticate with Microsoft to access your Intune policies.</p>
+
+                    {error && <div className="form-error">{error}</div>}
+
+                    <div style={{background: 'var(--bg-primary)', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem', fontSize: '0.8125rem'}}>
+                        <div style={{color: 'var(--text-muted)', marginBottom: '0.25rem'}}>Tenant ID</div>
+                        <div style={{fontFamily: 'JetBrains Mono', color: 'var(--text-secondary)'}}>{config.tenantId}</div>
+                    </div>
+
+                    <button className="btn btn-primary btn-block btn-large" onClick={onLogin} disabled={isLoading}>
+                        <Icons.Microsoft />
+                        {isLoading ? 'Signing in...' : 'Sign in with Microsoft'}
+                    </button>
+
+                    <div className="divider">or</div>
+
+                    <button className="btn btn-secondary btn-block" onClick={() => { clearConfig(); window.location.reload(); }}>
+                        Change Configuration
+                    </button>
+                </div>
+            </div>
+        );
+
+        const LoadingScreen = ({ progress, status }) => (
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <h3>Analyzing Policies</h3>
+                <p style={{color: 'var(--text-secondary)'}}>{status}</p>
+                <div className="progress-bar"><div className="progress-fill" style={{width: `${progress}%`}}></div></div>
+                <div className="progress-text">{Math.round(progress)}% complete</div>
+            </div>
+        );
+
+        const ConflictCard = ({ conflict, expanded, onToggle }) => (
+            <div className={`conflict-card severity-${conflict.severity} ${expanded ? 'expanded' : ''}`}>
+                <div className="conflict-header" onClick={onToggle}>
+                    <div className="conflict-info">
+                        <div className="conflict-title"><span className="conflict-setting">{conflict.settingName}</span></div>
+                        <div className="conflict-meta">
+                            <span className="conflict-meta-item"><Icons.Layers /> {conflict.instances.length} policies</span>
+                            <span className="conflict-meta-item"><Icons.Users /> {new Set(conflict.instances.flatMap(i => i.assignedGroups)).size} groups</span>
+                        </div>
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                        <span className={`severity-badge ${conflict.severity}`}>{conflict.severity}</span>
+                        <span className="conflict-expand-icon"><Icons.ChevronDown /></span>
+                    </div>
+                </div>
+                {expanded && (
+                    <div className="conflict-details">
+                        <div className="conflict-details-inner">
+                            <div className="policy-comparison">
+                                {conflict.instances.map((inst, i) => (
+                                    <div className="policy-item" key={i}>
+                                        <div className="policy-item-header">
+                                            <span className={`policy-type-icon ${POLICY_TYPES[inst.policyType]?.icon}`}>{POLICY_TYPES[inst.policyType]?.name[0]}</span>
+                                            <span>{inst.policy.displayName || inst.policy.name}</span>
+                                        </div>
+                                        <div className="policy-value">{inst.valueDisplay}</div>
+                                        <div className="policy-assignments">
+                                            <strong>Assignments:</strong>
+                                            <div>{inst.assignedGroups.slice(0, 3).map((g, j) => <span className="assignment-tag" key={j}>{g.includes('allDevices') ? 'All Devices' : g.includes('allUsers') ? 'All Users' : g.slice(0,12)+'...'}</span>)}{inst.assignedGroups.length > 3 && <span className="assignment-tag">+{inst.assignedGroups.length - 3}</span>}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="resolution-section">
+                                <div className="resolution-title"><Icons.Lightbulb /> Recommended Resolution</div>
+                                <div className="resolution-steps"><ol>{conflict.resolution.map((s, i) => <li key={i}>{s}</li>)}</ol></div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+
+        const Dashboard = ({ policies, conflicts, onRefresh, isRefreshing, onSettings }) => {
+            const [activeTab, setActiveTab] = useState('conflicts');
+            const [search, setSearch] = useState('');
+            const [severity, setSeverity] = useState('all');
+            const [expandedId, setExpandedId] = useState(null);
+
+            const total = Object.values(policies).reduce((s, a) => s + a.length, 0);
+            const conflictIds = new Set(conflicts.flatMap(c => c.instances.map(i => i.policy.id)));
+            const stats = { total, conflicts: conflicts.length, high: conflicts.filter(c => c.severity === 'high').length, clean: total - conflictIds.size };
+
+            const filtered = conflicts.filter(c => {
+                if (severity !== 'all' && c.severity !== severity) return false;
+                if (search && !c.settingName.toLowerCase().includes(search.toLowerCase())) return false;
+                return true;
+            });
+
+            const exportReport = () => {
+                const report = { generated: new Date().toISOString(), stats, conflicts: conflicts.map(c => ({ setting: c.settingName, severity: c.severity, policies: c.instances.map(i => ({ name: i.policy.displayName, type: i.policyType, value: i.valueDisplay })), resolution: c.resolution })) };
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `intune-conflicts-${new Date().toISOString().split('T')[0]}.json`; a.click();
+            };
+
+            const tabs = [{ id: 'conflicts', label: 'Conflicts', badge: conflicts.length, badgeClass: conflicts.length ? 'conflicts' : '' }, ...Object.entries(POLICY_TYPES).map(([id, c]) => ({ id, label: c.name, badge: policies[id]?.length || 0 }))];
+
+            return (
+                <div className="fade-in">
+                    <div className="dashboard-header">
+                        <div className="dashboard-title"><h2>Policy Analysis Results</h2><p>Review conflicts and recommendations</p></div>
+                        <div className="dashboard-actions">
+                            <button className="btn btn-secondary" onClick={exportReport}><Icons.Download /> Export</button>
+                            <button className="btn btn-primary" onClick={onRefresh} disabled={isRefreshing}><Icons.RefreshCw /> {isRefreshing ? 'Analyzing...' : 'Refresh'}</button>
+                        </div>
+                    </div>
+
+                    <div className="stats-grid">
+                        <div className="stat-card"><div className="stat-label">Total Policies</div><div className="stat-value policies">{stats.total}</div></div>
+                        <div className="stat-card"><div className="stat-label">Conflicts Found</div><div className="stat-value conflicts">{stats.conflicts}</div></div>
+                        <div className="stat-card"><div className="stat-label">High Severity</div><div className="stat-value conflicts">{stats.high}</div></div>
+                        <div className="stat-card"><div className="stat-label">Clean Policies</div><div className="stat-value clean">{stats.clean}</div></div>
+                    </div>
+
+                    <div className="tabs">{tabs.map(t => <button key={t.id} className={`tab ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}>{t.label}<span className={`tab-badge ${t.badgeClass || ''}`}>{t.badge}</span></button>)}</div>
+
+                    {activeTab === 'conflicts' && (
+                        <>
+                            <div className="filter-bar">
+                                <div className="search-wrapper">
+                                    <span className="search-icon"><Icons.Search /></span>
+                                    <input className="search-input" placeholder="Search conflicts..." value={search} onChange={e => setSearch(e.target.value)} />
+                                </div>
+                                <select className="filter-select" value={severity} onChange={e => setSeverity(e.target.value)}>
+                                    <option value="all">All Severities</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                            {filtered.length === 0 ? (
+                                <div className="empty-state"><div className="empty-icon">✅</div><h3>No Conflicts Found</h3><p>{conflicts.length === 0 ? 'Your policies have no conflicts!' : 'No conflicts match your filter.'}</p></div>
+                            ) : (
+                                <div className="conflicts-list">{filtered.map(c => <ConflictCard key={c.id} conflict={c} expanded={expandedId === c.id} onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)} />)}</div>
+                            )}
+                        </>
+                    )}
+
+                    {activeTab !== 'conflicts' && (
+                        <div className="policy-table">
+                            <div className="policy-table-header"><div>Policy Name</div><div>Type</div><div>Status</div><div>Conflicts</div></div>
+                            {(policies[activeTab] || []).map((p, i) => {
+                                const cnt = conflicts.filter(c => c.instances.some(inst => inst.policy.id === p.id)).length;
+                                return (
+                                    <div className="policy-table-row" key={p.id || i}>
+                                        <div className="policy-name"><span className={`policy-type-icon ${POLICY_TYPES[activeTab]?.icon}`}>{POLICY_TYPES[activeTab]?.name[0]}</span>{p.displayName || p.name || 'Unnamed'}</div>
+                                        <div>{POLICY_TYPES[activeTab]?.name}</div>
+                                        <div><span className={`policy-status ${cnt > 0 ? 'has-conflicts' : 'clean'}`}>{cnt > 0 ? <><Icons.AlertTriangle /> Conflicts</> : <><Icons.Check /> Clean</>}</span></div>
+                                        <div>{cnt || '-'}</div>
+                                    </div>
+                                );
+                            })}
+                            {(policies[activeTab] || []).length === 0 && <div className="empty-state"><div className="empty-icon">📋</div><h3>No Policies</h3><p>No {POLICY_TYPES[activeTab]?.name} policies found.</p></div>}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => { const t = setTimeout(onClose, 5000); return () => clearTimeout(t); }, []);
+            return <div className={`toast ${type}`}><div className="toast-icon">{type === 'success' ? '✓' : '!'}</div><span>{message}</span></div>;
+        };
+
+        // Main App
+        const App = () => {
+            const [config, setConfig] = useState(getStoredConfig);
+            const [msalInstance, setMsalInstance] = useState(null);
+            const [user, setUser] = useState(null);
+            const [authError, setAuthError] = useState('');
+            const [isAuthLoading, setIsAuthLoading] = useState(false);
+            const [showConfig, setShowConfig] = useState(!config);
+
+            const [policies, setPolicies] = useState({});
+            const [conflicts, setConflicts] = useState([]);
+            const [isLoading, setIsLoading] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [status, setStatus] = useState('');
+            const [toasts, setToasts] = useState([]);
+
+            const addToast = (message, type = 'success') => setToasts(prev => [...prev, { id: Date.now(), message, type }]);
+
+            // Initialize MSAL when config changes
+            useEffect(() => {
+                if (!config) return;
+                const instance = new msal.PublicClientApplication({
+                    auth: {
+                        clientId: config.clientId,
+                        authority: `https://login.microsoftonline.com/${config.tenantId}`,
+                        redirectUri: window.location.origin + window.location.pathname
+                    },
+                    cache: { cacheLocation: 'localStorage' }
+                });
+                instance.initialize().then(() => {
+                    setMsalInstance(instance);
+                    const accounts = instance.getAllAccounts();
+                    if (accounts.length > 0) {
+                        instance.acquireTokenSilent({ scopes: ['DeviceManagementConfiguration.Read.All'], account: accounts[0] })
+                            .then(resp => setUser(resp.account))
+                            .catch(() => {});
+                    }
+                });
+            }, [config]);
+
+            const login = async () => {
+                if (!msalInstance) return;
+                setAuthError('');
+                setIsAuthLoading(true);
+                try {
+                    const resp = await msalInstance.loginPopup({
+                        scopes: ['DeviceManagementConfiguration.Read.All', 'DeviceManagementManagedDevices.Read.All', 'DeviceManagementApps.Read.All', 'Group.Read.All'],
+                        prompt: 'select_account'
+                    });
+                    setUser(resp.account);
+                } catch (e) {
+                    console.error(e);
+                    setAuthError(e.message || 'Authentication failed');
+                } finally {
+                    setIsAuthLoading(false);
+                }
+            };
+
+            const logout = async () => {
+                if (msalInstance) {
+                    try { await msalInstance.logoutPopup(); } catch {}
+                }
+                setUser(null);
+                setPolicies({});
+                setConflicts([]);
+            };
+
+            const getToken = async () => {
+                const accounts = msalInstance.getAllAccounts();
+                try {
+                    return (await msalInstance.acquireTokenSilent({ scopes: ['DeviceManagementConfiguration.Read.All', 'DeviceManagementManagedDevices.Read.All', 'DeviceManagementApps.Read.All', 'Group.Read.All'], account: accounts[0] })).accessToken;
+                } catch {
+                    return (await msalInstance.acquireTokenPopup({ scopes: ['DeviceManagementConfiguration.Read.All', 'DeviceManagementManagedDevices.Read.All', 'DeviceManagementApps.Read.All', 'Group.Read.All'] })).accessToken;
+                }
+            };
+
+            const fetchGraph = async (endpoint) => {
+                const token = await getToken();
+                const url = endpoint.startsWith('http') ? endpoint : `https://graph.microsoft.com/beta${endpoint}`;
+                const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).error?.message || `Error ${resp.status}`);
+                return resp.json();
+            };
+
+            const fetchAllPages = async (endpoint) => {
+                const results = [];
+                let url = endpoint;
+                while (url) {
+                    const resp = await fetchGraph(url);
+                    if (resp.value) results.push(...resp.value);
+                    url = resp['@odata.nextLink'];
+                }
+                return results;
+            };
+
+            const fetchPolicies = useCallback(async () => {
+                setIsLoading(true);
+                setProgress(0);
+                const allPolicies = {}, allAssignments = {}, allSettings = {};
+                try {
+                    const types = Object.entries(POLICY_TYPES);
+                    let step = 0;
+                    const totalSteps = types.length * 3;
+
+                    for (const [key, cfg] of types) {
+                        setStatus(`Fetching ${cfg.name}...`);
+                        try {
+                            const fetched = await fetchAllPages(cfg.endpoint);
+                            allPolicies[key] = fetched;
+                            step++; setProgress(step / totalSteps * 100);
+
+                            if (cfg.assignmentsEndpoint) {
+                                setStatus(`Fetching ${cfg.name} assignments...`);
+                                for (const p of fetched) {
+                                    try { allAssignments[p.id] = (await fetchGraph(cfg.assignmentsEndpoint(p.id))).value || []; } catch { allAssignments[p.id] = []; }
+                                }
+                            }
+                            step++; setProgress(step / totalSteps * 100);
+
+                            const settingsEp = cfg.settingsEndpoint || cfg.valuesEndpoint;
+                            if (settingsEp) {
+                                setStatus(`Fetching ${cfg.name} settings...`);
+                                for (const p of fetched) {
+                                    try { allSettings[p.id] = (await fetchGraph(settingsEp(p.id))).value || []; } catch { allSettings[p.id] = []; }
+                                }
+                            }
+                            step++; setProgress(step / totalSteps * 100);
+                        } catch (e) {
+                            console.warn(`Error fetching ${cfg.name}:`, e);
+                            allPolicies[key] = [];
+                            step += 3; setProgress(step / totalSteps * 100);
+                        }
+                    }
+
+                    setStatus('Analyzing conflicts...');
+                    const detected = analyzeConflicts(allPolicies, allAssignments, allSettings);
+                    setPolicies(allPolicies);
+                    setConflicts(detected);
+                    const total = Object.values(allPolicies).reduce((s, a) => s + a.length, 0);
+                    addToast(`Analyzed ${total} policies, found ${detected.length} conflicts`, detected.length > 0 ? 'error' : 'success');
+                } catch (e) {
+                    console.error(e);
+                    addToast(`Error: ${e.message}`, 'error');
+                } finally {
+                    setIsLoading(false);
+                }
+            }, [msalInstance]);
+
+            useEffect(() => {
+                if (user && msalInstance && Object.keys(policies).length === 0 && !isLoading) fetchPolicies();
+            }, [user, msalInstance]);
+
+            if (showConfig || !config) {
+                return (
+                    <div className="app-container">
+                        <Header user={null} />
+                        <main className="main-content">
+                            <ConfigScreen existingConfig={config} onSave={(c) => { setConfig(c); setShowConfig(false); }} />
+                        </main>
+                    </div>
+                );
+            }
+
+            if (!user) {
+                return (
+                    <div className="app-container">
+                        <Header user={null} />
+                        <main className="main-content">
+                            <LoginScreen config={config} onLogin={login} error={authError} isLoading={isAuthLoading} />
+                        </main>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="app-container">
+                    <Header user={user} onLogout={logout} onSettings={() => setShowConfig(true)} showSettings={true} />
+                    <main className="main-content">
+                        {isLoading ? <LoadingScreen progress={progress} status={status} /> : <Dashboard policies={policies} conflicts={conflicts} onRefresh={fetchPolicies} isRefreshing={isLoading} onSettings={() => setShowConfig(true)} />}
+                    </main>
+                    <div className="toast-container">{toasts.map(t => <Toast key={t.id} message={t.message} type={t.type} onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))} />)}</div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
