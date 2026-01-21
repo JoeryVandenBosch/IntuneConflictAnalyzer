@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intune Policy Conflict Analyzer - Preview</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #0d1117;
+            --bg-tertiary: #151b23;
+            --bg-elevated: #1c232d;
+            --border-primary: #2d3748;
+            --border-secondary: #3d4a5c;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #0078d4;
+            --accent-blue-hover: #1a86d9;
+            --accent-cyan: #00d4aa;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            --accent-green: #22c55e;
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 40px rgba(0, 120, 212, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-bottom: 1px solid var(--border-primary);
+            padding: 1.25rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-text span {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .demo-badge {
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-yellow));
+            color: #000;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            background: var(--accent-purple);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .main-content {
+            flex: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+            width: 100%;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-elevated);
+            border-color: var(--border-secondary);
+        }
+
+        .btn-icon {
+            padding: 0.5rem;
+        }
+
+        .dashboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .dashboard-title h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .dashboard-title p {
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+        }
+
+        .dashboard-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-secondary);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .stat-value.conflicts { color: var(--accent-red); }
+        .stat-value.warnings { color: var(--accent-yellow); }
+        .stat-value.policies { color: var(--accent-blue); }
+        .stat-value.clean { color: var(--accent-green); }
+
+        .tabs-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.25rem;
+            background: var(--bg-secondary);
+            padding: 0.25rem;
+            border-radius: 10px;
+            border: 1px solid var(--border-primary);
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 0.625rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            background: transparent;
+            border: none;
+            font-family: inherit;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .tab.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .tab:not(.active) .tab-badge {
+            background: var(--bg-elevated);
+        }
+
+        .tab-badge.conflicts {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .conflicts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .conflict-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .conflict-card:hover {
+            border-color: var(--border-secondary);
+        }
+
+        .conflict-card.severity-high {
+            border-left: 4px solid var(--accent-red);
+        }
+
+        .conflict-card.severity-medium {
+            border-left: 4px solid var(--accent-orange);
+        }
+
+        .conflict-card.severity-low {
+            border-left: 4px solid var(--accent-yellow);
+        }
+
+        .conflict-header {
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            cursor: pointer;
+        }
+
+        .conflict-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .conflict-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .conflict-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .conflict-setting {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--accent-cyan);
+            background: var(--bg-primary);
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .conflict-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .conflict-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .severity-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .severity-badge.high {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        .severity-badge.medium {
+            background: rgba(249, 115, 22, 0.15);
+            color: var(--accent-orange);
+        }
+
+        .severity-badge.low {
+            background: rgba(234, 179, 8, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .conflict-expand-icon {
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+        }
+
+        .conflict-card.expanded .conflict-expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .conflict-details {
+            padding: 0 1.25rem 1.25rem;
+            border-top: 1px solid var(--border-primary);
+            margin-top: -1px;
+        }
+
+        .conflict-details-inner {
+            padding-top: 1.25rem;
+        }
+
+        .policy-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .policy-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .policy-item-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        .policy-type-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: white;
+        }
+
+        .policy-type-icon.settings-catalog { background: var(--accent-blue); }
+        .policy-type-icon.device-config { background: var(--accent-purple); }
+        .policy-type-icon.endpoint-security { background: var(--accent-red); }
+
+        .policy-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            word-break: break-all;
+        }
+
+        .policy-assignments {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .assignment-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.125rem 0.5rem;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            margin: 0.25rem 0.25rem 0 0;
+            font-size: 0.75rem;
+        }
+
+        .resolution-section {
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .resolution-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin-bottom: 0.75rem;
+        }
+
+        .resolution-steps {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .resolution-steps ol {
+            margin-left: 1.25rem;
+        }
+
+        .resolution-steps li {
+            margin-bottom: 0.5rem;
+        }
+
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 0.625rem 1rem;
+            padding-left: 2.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.875rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            padding: 0.625rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 160px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        @media (max-width: 768px) {
+            .header { padding: 1rem; }
+            .main-content { padding: 1rem; }
+            .policy-comparison { grid-template-columns: 1fr; }
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .dashboard-actions {
+                width: 100%;
+            }
+            .dashboard-actions .btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // Icons
+        const Icons = {
+            Shield: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            ),
+            ChevronDown: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            ),
+            RefreshCw: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg>
+            ),
+            Search: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+            ),
+            LogOut: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+            ),
+            Lightbulb: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18h6"/><path d="M10 22h4"/>
+                    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 019 14"/>
+                </svg>
+            ),
+            Users: () => (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                </svg>
+            ),
+            Layers: () => (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+                </svg>
+            ),
+            Download: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            )
+        };
+
+        // Mock Data
+        const MOCK_CONFLICTS = [
+            {
+                id: 'conflict-1',
+                settingName: 'Firewall Enabled',
+                severity: 'high',
+                instances: [
+                    {
+                        policy: { id: '1', displayName: 'Corporate Security Baseline' },
+                        policyType: 'settingsCatalog',
+                        value: true,
+                        valueDisplay: 'Enabled',
+                        assignedGroups: ['All Corporate Devices', 'IT Department']
+                    },
+                    {
+                        policy: { id: '2', displayName: 'Developer Workstations' },
+                        policyType: 'deviceConfiguration',
+                        value: false,
+                        valueDisplay: 'Disabled',
+                        assignedGroups: ['Developer Group', 'IT Department']
+                    }
+                ],
+                resolution: [
+                    'Consolidate firewall settings into a single Settings Catalog policy',
+                    'Remove firewall configuration from the Device Configuration profile',
+                    'Review if developers truly need firewall disabled or if exceptions can be configured instead',
+                    'Consider using the value "Enabled" from "Corporate Security Baseline" for all devices'
+                ]
+            },
+            {
+                id: 'conflict-2',
+                settingName: 'BitLocker Encryption Method',
+                severity: 'high',
+                instances: [
+                    {
+                        policy: { id: '3', displayName: 'Endpoint Security - Disk Encryption' },
+                        policyType: 'endpointSecurity',
+                        value: 'XtsAes256',
+                        valueDisplay: 'XTS-AES 256-bit',
+                        assignedGroups: ['All Devices']
+                    },
+                    {
+                        policy: { id: '4', displayName: 'Windows 10 Configuration' },
+                        policyType: 'settingsCatalog',
+                        value: 'XtsAes128',
+                        valueDisplay: 'XTS-AES 128-bit',
+                        assignedGroups: ['Windows 10 Devices']
+                    }
+                ],
+                resolution: [
+                    'Standardize on XTS-AES 256-bit encryption for all devices',
+                    'Remove BitLocker settings from the Settings Catalog policy',
+                    'Use Endpoint Security policies for all disk encryption settings',
+                    'Verify existing devices can be upgraded without data loss'
+                ]
+            },
+            {
+                id: 'conflict-3',
+                settingName: 'Password Minimum Length',
+                severity: 'medium',
+                instances: [
+                    {
+                        policy: { id: '5', displayName: 'Compliance - Corporate' },
+                        policyType: 'compliance',
+                        value: 12,
+                        valueDisplay: '12 characters',
+                        assignedGroups: ['All Users']
+                    },
+                    {
+                        policy: { id: '6', displayName: 'Compliance - Contractors' },
+                        policyType: 'compliance',
+                        value: 8,
+                        valueDisplay: '8 characters',
+                        assignedGroups: ['Contractor Devices']
+                    }
+                ],
+                resolution: [
+                    'Review if different password requirements are intentional',
+                    'Consider standardizing to 12 characters for improved security',
+                    'Document any business justification for different requirements',
+                    'Ensure contractor policy doesn\'t apply to corporate devices'
+                ]
+            },
+            {
+                id: 'conflict-4',
+                settingName: 'Windows Update Deferral Days',
+                severity: 'medium',
+                instances: [
+                    {
+                        policy: { id: '7', displayName: 'Update Ring - Production' },
+                        policyType: 'windowsUpdateRings',
+                        value: 14,
+                        valueDisplay: '14 days',
+                        assignedGroups: ['Production Devices']
+                    },
+                    {
+                        policy: { id: '8', displayName: 'Update Ring - Standard' },
+                        policyType: 'windowsUpdateRings',
+                        value: 7,
+                        valueDisplay: '7 days',
+                        assignedGroups: ['All Devices']
+                    }
+                ],
+                resolution: [
+                    'Review group membership to ensure no overlap',
+                    'Exclude Production Devices from the Standard update ring',
+                    'Document the update strategy for different device types',
+                    'Consider using a pilot ring before production deployment'
+                ]
+            },
+            {
+                id: 'conflict-5',
+                settingName: 'Telemetry Level',
+                severity: 'low',
+                instances: [
+                    {
+                        policy: { id: '9', displayName: 'Privacy Settings' },
+                        policyType: 'settingsCatalog',
+                        value: 'Basic',
+                        valueDisplay: 'Basic',
+                        assignedGroups: ['All Devices']
+                    },
+                    {
+                        policy: { id: '10', displayName: 'Admin Templates - Telemetry' },
+                        policyType: 'adminTemplates',
+                        value: 'Enhanced',
+                        valueDisplay: 'Enhanced',
+                        assignedGroups: ['Pilot Group']
+                    }
+                ],
+                resolution: [
+                    'Decide on a consistent telemetry level based on privacy requirements',
+                    'Use Settings Catalog for modern telemetry configuration',
+                    'Remove legacy Admin Template configuration',
+                    'Consider "Basic" for production and "Enhanced" only for troubleshooting'
+                ]
+            }
+        ];
+
+        const MOCK_POLICIES = {
+            settingsCatalog: [
+                { id: '1', displayName: 'Corporate Security Baseline', platforms: 'Windows' },
+                { id: '4', displayName: 'Windows 10 Configuration', platforms: 'Windows' },
+                { id: '9', displayName: 'Privacy Settings', platforms: 'Windows' },
+                { id: '11', displayName: 'Edge Browser Settings', platforms: 'Windows' },
+                { id: '12', displayName: 'OneDrive Configuration', platforms: 'Windows' }
+            ],
+            deviceConfiguration: [
+                { id: '2', displayName: 'Developer Workstations', platforms: 'Windows' },
+                { id: '13', displayName: 'Kiosk Mode - Reception', platforms: 'Windows' },
+                { id: '14', displayName: 'VPN Profile - Corporate', platforms: 'Windows' }
+            ],
+            endpointSecurity: [
+                { id: '3', displayName: 'Endpoint Security - Disk Encryption', platforms: 'Windows' },
+                { id: '15', displayName: 'Antivirus - Defender', platforms: 'Windows' },
+                { id: '16', displayName: 'Firewall Rules', platforms: 'Windows' }
+            ],
+            compliance: [
+                { id: '5', displayName: 'Compliance - Corporate', platforms: 'Windows' },
+                { id: '6', displayName: 'Compliance - Contractors', platforms: 'Windows' },
+                { id: '17', displayName: 'Compliance - iOS', platforms: 'iOS' }
+            ],
+            adminTemplates: [
+                { id: '10', displayName: 'Admin Templates - Telemetry', platforms: 'Windows' },
+                { id: '18', displayName: 'Admin Templates - Office', platforms: 'Windows' }
+            ],
+            scripts: [
+                { id: '19', displayName: 'Remediation - Stale Profiles', platforms: 'Windows' },
+                { id: '20', displayName: 'Detection - Bloatware', platforms: 'Windows' }
+            ]
+        };
+
+        // Components
+        const ConflictCard = ({ conflict, expanded, onToggle }) => (
+            <div className={`conflict-card severity-${conflict.severity} ${expanded ? 'expanded' : ''}`}>
+                <div className="conflict-header" onClick={onToggle}>
+                    <div className="conflict-info">
+                        <div className="conflict-title">
+                            <span className="conflict-setting">{conflict.settingName}</span>
+                        </div>
+                        <div className="conflict-meta">
+                            <span className="conflict-meta-item">
+                                <Icons.Layers />
+                                {conflict.instances.length} policies
+                            </span>
+                            <span className="conflict-meta-item">
+                                <Icons.Users />
+                                {new Set(conflict.instances.flatMap(i => i.assignedGroups)).size} groups affected
+                            </span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <span className={`severity-badge ${conflict.severity}`}>
+                            {conflict.severity}
+                        </span>
+                        <span className="conflict-expand-icon">
+                            <Icons.ChevronDown />
+                        </span>
+                    </div>
+                </div>
+
+                {expanded && (
+                    <div className="conflict-details">
+                        <div className="conflict-details-inner">
+                            <div className="policy-comparison">
+                                {conflict.instances.map((instance, idx) => (
+                                    <div className="policy-item" key={idx}>
+                                        <div className="policy-item-header">
+                                            <span className={`policy-type-icon ${instance.policyType === 'settingsCatalog' ? 'settings-catalog' : instance.policyType === 'deviceConfiguration' ? 'device-config' : 'endpoint-security'}`}>
+                                                {instance.policyType[0].toUpperCase()}
+                                            </span>
+                                            <span>{instance.policy.displayName}</span>
+                                        </div>
+                                        <div className="policy-value">{instance.valueDisplay}</div>
+                                        <div className="policy-assignments">
+                                            <strong>Assignments:</strong>
+                                            <div>
+                                                {instance.assignedGroups.map((group, gIdx) => (
+                                                    <span className="assignment-tag" key={gIdx}>{group}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="resolution-section">
+                                <div className="resolution-title">
+                                    <Icons.Lightbulb />
+                                    Recommended Resolution
+                                </div>
+                                <div className="resolution-steps">
+                                    <ol>
+                                        {conflict.resolution.map((step, idx) => (
+                                            <li key={idx}>{step}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('conflicts');
+            const [expandedId, setExpandedId] = useState('conflict-1');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [severityFilter, setSeverityFilter] = useState('all');
+
+            const stats = {
+                totalPolicies: 20,
+                conflicts: 5,
+                highSeverity: 2,
+                cleanPolicies: 15
+            };
+
+            const tabs = [
+                { id: 'conflicts', label: 'Conflicts', badge: 5, badgeClass: 'conflicts' },
+                { id: 'settingsCatalog', label: 'Settings Catalog', badge: 5 },
+                { id: 'deviceConfiguration', label: 'Device Config', badge: 3 },
+                { id: 'endpointSecurity', label: 'Endpoint Security', badge: 3 },
+                { id: 'compliance', label: 'Compliance', badge: 3 },
+                { id: 'adminTemplates', label: 'Admin Templates', badge: 2 },
+                { id: 'scripts', label: 'Scripts', badge: 2 }
+            ];
+
+            const filteredConflicts = MOCK_CONFLICTS.filter(c => {
+                if (severityFilter !== 'all' && c.severity !== severityFilter) return false;
+                if (searchQuery) {
+                    return c.settingName.toLowerCase().includes(searchQuery.toLowerCase());
+                }
+                return true;
+            });
+
+            return (
+                <div className="app-container">
+                    <header className="header">
+                        <div className="header-content">
+                            <div className="logo-section">
+                                <div className="logo-icon">
+                                    <Icons.Shield />
+                                </div>
+                                <div className="logo-text">
+                                    <h1>Intune Policy Conflict Analyzer</h1>
+                                    <span>Policy Management Tool</span>
+                                </div>
+                            </div>
+                            <div className="header-actions">
+                                <span className="demo-badge">Preview Mode</span>
+                                <div className="user-badge">
+                                    <div className="user-avatar">J</div>
+                                    <span>Joery Van den Bosch</span>
+                                </div>
+                                <button className="btn btn-secondary btn-icon" title="Sign out">
+                                    <Icons.LogOut />
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="main-content">
+                        <div className="fade-in">
+                            <div className="dashboard-header">
+                                <div className="dashboard-title">
+                                    <h2>Policy Analysis Results</h2>
+                                    <p>Review detected conflicts and their recommended resolutions</p>
+                                </div>
+                                <div className="dashboard-actions">
+                                    <button className="btn btn-secondary">
+                                        <Icons.Download /> Export Report
+                                    </button>
+                                    <button className="btn btn-primary">
+                                        <Icons.RefreshCw /> Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="stats-grid">
+                                <div className="stat-card" style={{ animationDelay: '0ms' }}>
+                                    <div className="stat-label">Total Policies</div>
+                                    <div className="stat-value policies">{stats.totalPolicies}</div>
+                                </div>
+                                <div className="stat-card" style={{ animationDelay: '50ms' }}>
+                                    <div className="stat-label">Conflicts Found</div>
+                                    <div className="stat-value conflicts">{stats.conflicts}</div>
+                                </div>
+                                <div className="stat-card" style={{ animationDelay: '100ms' }}>
+                                    <div className="stat-label">High Severity</div>
+                                    <div className="stat-value conflicts">{stats.highSeverity}</div>
+                                </div>
+                                <div className="stat-card" style={{ animationDelay: '150ms' }}>
+                                    <div className="stat-label">Policies Without Conflicts</div>
+                                    <div className="stat-value clean">{stats.cleanPolicies}</div>
+                                </div>
+                            </div>
+
+                            <div className="tabs-container">
+                                <div className="tabs">
+                                    {tabs.map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+                                            onClick={() => setActiveTab(tab.id)}
+                                        >
+                                            {tab.label}
+                                            <span className={`tab-badge ${tab.badgeClass || ''}`}>{tab.badge}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {activeTab === 'conflicts' && (
+                                <>
+                                    <div className="filter-bar">
+                                        <div className="search-wrapper">
+                                            <span className="search-icon"><Icons.Search /></span>
+                                            <input
+                                                type="text"
+                                                className="search-input"
+                                                placeholder="Search conflicts by setting name or policy..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                            />
+                                        </div>
+                                        <select
+                                            className="filter-select"
+                                            value={severityFilter}
+                                            onChange={(e) => setSeverityFilter(e.target.value)}
+                                        >
+                                            <option value="all">All Severities</option>
+                                            <option value="high">High Only</option>
+                                            <option value="medium">Medium Only</option>
+                                            <option value="low">Low Only</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="conflicts-list">
+                                        {filteredConflicts.map(conflict => (
+                                            <ConflictCard
+                                                key={conflict.id}
+                                                conflict={conflict}
+                                                expanded={expandedId === conflict.id}
+                                                onToggle={() => setExpandedId(expandedId === conflict.id ? null : conflict.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {activeTab !== 'conflicts' && (
+                                <div style={{ 
+                                    background: 'var(--bg-secondary)', 
+                                    border: '1px solid var(--border-primary)', 
+                                    borderRadius: '12px',
+                                    padding: '3rem',
+                                    textAlign: 'center'
+                                }}>
+                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
+                                    <h3 style={{ marginBottom: '0.5rem' }}>Policy List View</h3>
+                                    <p style={{ color: 'var(--text-secondary)' }}>
+                                        In the full version, this tab shows all {tabs.find(t => t.id === activeTab)?.label} policies with their conflict status.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

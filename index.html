@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intune Policy Conflict Analyzer</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #0d1117;
+            --bg-tertiary: #151b23;
+            --bg-elevated: #1c232d;
+            --border-primary: #2d3748;
+            --border-secondary: #3d4a5c;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #0078d4;
+            --accent-blue-hover: #1a86d9;
+            --accent-cyan: #00d4aa;
+            --accent-purple: #8b5cf6;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            --accent-green: #22c55e;
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 40px rgba(0, 120, 212, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .slide-in {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        /* App container */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-bottom: 1px solid var(--border-primary);
+            padding: 1.25rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-text span {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            background: var(--accent-purple);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+            width: 100%;
+        }
+
+        /* Auth section */
+        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 200px);
+        }
+
+        .auth-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            padding: 3rem;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .auth-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            border-radius: 20px;
+            margin: 0 auto 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .auth-card h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-card p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .device-code-display {
+            background: var(--bg-primary);
+            border: 2px dashed var(--border-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .device-code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            color: var(--accent-cyan);
+        }
+
+        .device-code-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--accent-blue);
+            font-weight: 500;
+            text-decoration: none;
+            margin-bottom: 2rem;
+        }
+
+        .auth-link:hover {
+            text-decoration: underline;
+        }
+
+        .auth-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .auth-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-secondary);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-elevated);
+            border-color: var(--border-secondary);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-icon {
+            padding: 0.5rem;
+        }
+
+        /* Dashboard */
+        .dashboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .dashboard-title h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .dashboard-title p {
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+        }
+
+        .dashboard-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-secondary);
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .stat-value.conflicts {
+            color: var(--accent-red);
+        }
+
+        .stat-value.warnings {
+            color: var(--accent-yellow);
+        }
+
+        .stat-value.policies {
+            color: var(--accent-blue);
+        }
+
+        .stat-value.clean {
+            color: var(--accent-green);
+        }
+
+        /* Tabs */
+        .tabs-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.25rem;
+            background: var(--bg-secondary);
+            padding: 0.25rem;
+            border-radius: 10px;
+            border: 1px solid var(--border-primary);
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 0.625rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            background: transparent;
+            border: none;
+            font-family: inherit;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .tab.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .tab:not(.active) .tab-badge {
+            background: var(--bg-elevated);
+        }
+
+        .tab-badge.conflicts {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        /* Conflict cards */
+        .conflicts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .conflict-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .conflict-card:hover {
+            border-color: var(--border-secondary);
+        }
+
+        .conflict-card.severity-high {
+            border-left: 4px solid var(--accent-red);
+        }
+
+        .conflict-card.severity-medium {
+            border-left: 4px solid var(--accent-orange);
+        }
+
+        .conflict-card.severity-low {
+            border-left: 4px solid var(--accent-yellow);
+        }
+
+        .conflict-header {
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            cursor: pointer;
+        }
+
+        .conflict-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .conflict-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .conflict-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .conflict-setting {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--accent-cyan);
+            background: var(--bg-primary);
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .conflict-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .conflict-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .severity-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .severity-badge.high {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        .severity-badge.medium {
+            background: rgba(249, 115, 22, 0.15);
+            color: var(--accent-orange);
+        }
+
+        .severity-badge.low {
+            background: rgba(234, 179, 8, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .conflict-expand-icon {
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+        }
+
+        .conflict-card.expanded .conflict-expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .conflict-details {
+            padding: 0 1.25rem 1.25rem;
+            border-top: 1px solid var(--border-primary);
+            margin-top: -1px;
+        }
+
+        .conflict-details-inner {
+            padding-top: 1.25rem;
+        }
+
+        .policy-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .policy-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .policy-item-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        .policy-type-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+
+        .policy-type-icon.settings-catalog { background: var(--accent-blue); }
+        .policy-type-icon.device-config { background: var(--accent-purple); }
+        .policy-type-icon.endpoint-security { background: var(--accent-red); }
+        .policy-type-icon.compliance { background: var(--accent-green); }
+        .policy-type-icon.app-protection { background: var(--accent-orange); }
+        .policy-type-icon.scripts { background: var(--accent-cyan); }
+        .policy-type-icon.update-rings { background: var(--accent-yellow); color: #000; }
+        .policy-type-icon.admin-templates { background: #6366f1; }
+
+        .policy-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            word-break: break-all;
+        }
+
+        .policy-assignments {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .assignment-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.125rem 0.5rem;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            margin: 0.25rem 0.25rem 0 0;
+            font-size: 0.75rem;
+        }
+
+        .resolution-section {
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .resolution-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin-bottom: 0.75rem;
+        }
+
+        .resolution-steps {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .resolution-steps ol {
+            margin-left: 1.25rem;
+        }
+
+        .resolution-steps li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Policy list view */
+        .policy-table {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .policy-table-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 120px;
+            gap: 1rem;
+            padding: 0.875rem 1.25rem;
+            background: var(--bg-tertiary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .policy-table-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 120px;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--border-primary);
+            align-items: center;
+            font-size: 0.875rem;
+            transition: background 0.2s ease;
+        }
+
+        .policy-table-row:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .policy-name {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .policy-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .policy-status.has-conflicts {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
+        .policy-status.clean {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+        }
+
+        /* Loading state */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-secondary);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1.5rem;
+        }
+
+        .loading-progress {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 1.5rem;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .empty-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--bg-tertiary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            max-width: 400px;
+        }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 0.625rem 1rem;
+            padding-left: 2.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.875rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            padding: 0.625rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 160px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .toast {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-secondary);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            animation: slideIn 0.3s ease-out;
+            min-width: 300px;
+        }
+
+        .toast.success {
+            border-color: var(--accent-green);
+        }
+
+        .toast.error {
+            border-color: var(--accent-red);
+        }
+
+        .toast-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .toast.success .toast-icon {
+            background: var(--accent-green);
+        }
+
+        .toast.error .toast-icon {
+            background: var(--accent-red);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .auth-card {
+                padding: 2rem 1.5rem;
+            }
+
+            .device-code {
+                font-size: 1.5rem;
+            }
+
+            .policy-table-header,
+            .policy-table-row {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+
+            .policy-table-header > *:not(:first-child) {
+                display: none;
+            }
+
+            .policy-comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .dashboard-actions {
+                width: 100%;
+            }
+
+            .dashboard-actions .btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const CONFIG = {
+            clientId: '14d82eec-204b-4c2f-b7e8-296a70dab67e', // Microsoft Graph PowerShell
+            scopes: [
+                'DeviceManagementConfiguration.Read.All',
+                'DeviceManagementManagedDevices.Read.All',
+                'DeviceManagementApps.Read.All',
+                'Group.Read.All'
+            ],
+            tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+            deviceCodeEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/devicecode',
+            graphBaseUrl: 'https://graph.microsoft.com/beta'
+        };
+
+        // ============================================
+        // ICONS
+        // ============================================
+        const Icons = {
+            Shield: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            ),
+            AlertTriangle: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            ),
+            Check: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+            ),
+            ChevronDown: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            ),
+            RefreshCw: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg>
+            ),
+            Search: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+            ),
+            LogOut: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+            ),
+            ExternalLink: () => (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+            ),
+            Lightbulb: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18h6"/><path d="M10 22h4"/>
+                    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0018 8 6 6 0 006 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 019 14"/>
+                </svg>
+            ),
+            Users: () => (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+                </svg>
+            ),
+            Layers: () => (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+                </svg>
+            ),
+            Download: () => (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            )
+        };
+
+        // ============================================
+        // AUTH CONTEXT & HOOKS
+        // ============================================
+        const useAuth = () => {
+            const [authState, setAuthState] = useState({
+                isAuthenticated: false,
+                accessToken: null,
+                refreshToken: null,
+                expiresAt: null,
+                user: null
+            });
+            const [deviceCode, setDeviceCode] = useState(null);
+            const [isAuthenticating, setIsAuthenticating] = useState(false);
+            const pollIntervalRef = useRef(null);
+
+            // Load tokens from localStorage on mount
+            useEffect(() => {
+                const stored = localStorage.getItem('intune_analyzer_auth');
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored);
+                        if (parsed.expiresAt > Date.now()) {
+                            setAuthState({
+                                isAuthenticated: true,
+                                ...parsed
+                            });
+                        } else if (parsed.refreshToken) {
+                            // Token expired, try refresh
+                            refreshAccessToken(parsed.refreshToken);
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('intune_analyzer_auth');
+                    }
+                }
+            }, []);
+
+            const saveTokens = (tokens) => {
+                const authData = {
+                    accessToken: tokens.access_token,
+                    refreshToken: tokens.refresh_token,
+                    expiresAt: Date.now() + (tokens.expires_in * 1000),
+                    user: parseJwt(tokens.access_token)
+                };
+                localStorage.setItem('intune_analyzer_auth', JSON.stringify(authData));
+                setAuthState({
+                    isAuthenticated: true,
+                    ...authData
+                });
+            };
+
+            const parseJwt = (token) => {
+                try {
+                    const base64Url = token.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => 
+                        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+                    ).join(''));
+                    return JSON.parse(jsonPayload);
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            const startDeviceCodeFlow = async () => {
+                setIsAuthenticating(true);
+                try {
+                    const response = await fetch(CONFIG.deviceCodeEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            client_id: CONFIG.clientId,
+                            scope: CONFIG.scopes.join(' ')
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to get device code');
+                    }
+
+                    const data = await response.json();
+                    setDeviceCode(data);
+
+                    // Start polling for token
+                    pollIntervalRef.current = setInterval(async () => {
+                        try {
+                            const tokenResponse = await fetch(CONFIG.tokenEndpoint, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: new URLSearchParams({
+                                    grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+                                    client_id: CONFIG.clientId,
+                                    device_code: data.device_code
+                                })
+                            });
+
+                            const tokenData = await tokenResponse.json();
+
+                            if (tokenData.access_token) {
+                                clearInterval(pollIntervalRef.current);
+                                saveTokens(tokenData);
+                                setDeviceCode(null);
+                                setIsAuthenticating(false);
+                            } else if (tokenData.error && tokenData.error !== 'authorization_pending') {
+                                clearInterval(pollIntervalRef.current);
+                                setIsAuthenticating(false);
+                                setDeviceCode(null);
+                                console.error('Auth error:', tokenData.error_description);
+                            }
+                        } catch (e) {
+                            console.error('Poll error:', e);
+                        }
+                    }, data.interval * 1000);
+
+                } catch (error) {
+                    setIsAuthenticating(false);
+                    console.error('Device code error:', error);
+                }
+            };
+
+            const refreshAccessToken = async (refreshToken) => {
+                try {
+                    const response = await fetch(CONFIG.tokenEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            grant_type: 'refresh_token',
+                            client_id: CONFIG.clientId,
+                            refresh_token: refreshToken,
+                            scope: CONFIG.scopes.join(' ')
+                        })
+                    });
+
+                    if (response.ok) {
+                        const tokens = await response.json();
+                        saveTokens(tokens);
+                    } else {
+                        logout();
+                    }
+                } catch (e) {
+                    logout();
+                }
+            };
+
+            const logout = () => {
+                if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                }
+                localStorage.removeItem('intune_analyzer_auth');
+                setAuthState({
+                    isAuthenticated: false,
+                    accessToken: null,
+                    refreshToken: null,
+                    expiresAt: null,
+                    user: null
+                });
+                setDeviceCode(null);
+                setIsAuthenticating(false);
+            };
+
+            const getValidToken = async () => {
+                if (authState.expiresAt && authState.expiresAt < Date.now() + 60000) {
+                    // Token expires in less than 1 minute, refresh it
+                    if (authState.refreshToken) {
+                        await refreshAccessToken(authState.refreshToken);
+                    }
+                }
+                return authState.accessToken;
+            };
+
+            return {
+                ...authState,
+                deviceCode,
+                isAuthenticating,
+                startDeviceCodeFlow,
+                logout,
+                getValidToken
+            };
+        };
+
+        // ============================================
+        // GRAPH API SERVICE
+        // ============================================
+        const useGraphApi = (getValidToken) => {
+            const fetchGraph = async (endpoint, options = {}) => {
+                const token = await getValidToken();
+                if (!token) throw new Error('No access token');
+
+                const response = await fetch(`${CONFIG.graphBaseUrl}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.error?.message || `Graph API error: ${response.status}`);
+                }
+
+                return response.json();
+            };
+
+            const fetchAllPages = async (endpoint) => {
+                const results = [];
+                let url = endpoint;
+
+                while (url) {
+                    const response = await fetchGraph(url.replace(CONFIG.graphBaseUrl, ''));
+                    if (response.value) {
+                        results.push(...response.value);
+                    }
+                    url = response['@odata.nextLink'];
+                }
+
+                return results;
+            };
+
+            return { fetchGraph, fetchAllPages };
+        };
+
+        // ============================================
+        // POLICY TYPES CONFIGURATION
+        // ============================================
+        const POLICY_TYPES = {
+            settingsCatalog: {
+                name: 'Settings Catalog',
+                endpoint: '/deviceManagement/configurationPolicies',
+                settingsEndpoint: (id) => `/deviceManagement/configurationPolicies/${id}/settings`,
+                assignmentsEndpoint: (id) => `/deviceManagement/configurationPolicies/${id}/assignments`,
+                icon: 'settings-catalog',
+                color: '#0078d4'
+            },
+            deviceConfiguration: {
+                name: 'Device Configuration',
+                endpoint: '/deviceManagement/deviceConfigurations',
+                assignmentsEndpoint: (id) => `/deviceManagement/deviceConfigurations/${id}/assignments`,
+                icon: 'device-config',
+                color: '#8b5cf6'
+            },
+            endpointSecurity: {
+                name: 'Endpoint Security',
+                endpoint: '/deviceManagement/intents',
+                settingsEndpoint: (id) => `/deviceManagement/intents/${id}/settings`,
+                assignmentsEndpoint: (id) => `/deviceManagement/intents/${id}/assignments`,
+                icon: 'endpoint-security',
+                color: '#ef4444'
+            },
+            compliance: {
+                name: 'Compliance Policies',
+                endpoint: '/deviceManagement/deviceCompliancePolicies',
+                assignmentsEndpoint: (id) => `/deviceManagement/deviceCompliancePolicies/${id}/assignments`,
+                icon: 'compliance',
+                color: '#22c55e'
+            },
+            appProtection: {
+                name: 'App Protection',
+                endpoint: '/deviceAppManagement/managedAppPolicies',
+                icon: 'app-protection',
+                color: '#f97316'
+            },
+            scripts: {
+                name: 'PowerShell Scripts',
+                endpoint: '/deviceManagement/deviceManagementScripts',
+                assignmentsEndpoint: (id) => `/deviceManagement/deviceManagementScripts/${id}/assignments`,
+                icon: 'scripts',
+                color: '#00d4aa'
+            },
+            windowsUpdateRings: {
+                name: 'Update Rings',
+                endpoint: '/deviceManagement/deviceConfigurations',
+                filter: (p) => p['@odata.type'] === '#microsoft.graph.windowsUpdateForBusinessConfiguration',
+                assignmentsEndpoint: (id) => `/deviceManagement/deviceConfigurations/${id}/assignments`,
+                icon: 'update-rings',
+                color: '#eab308'
+            },
+            adminTemplates: {
+                name: 'Administrative Templates',
+                endpoint: '/deviceManagement/groupPolicyConfigurations',
+                valuesEndpoint: (id) => `/deviceManagement/groupPolicyConfigurations/${id}/definitionValues`,
+                assignmentsEndpoint: (id) => `/deviceManagement/groupPolicyConfigurations/${id}/assignments`,
+                icon: 'admin-templates',
+                color: '#6366f1'
+            }
+        };
+
+        // ============================================
+        // CONFLICT ANALYZER
+        // ============================================
+        const analyzeConflicts = (allPolicies, assignments, settings) => {
+            const conflicts = [];
+            const settingsMap = new Map();
+
+            // Build a map of all settings across all policies
+            Object.entries(allPolicies).forEach(([policyType, policies]) => {
+                policies.forEach(policy => {
+                    const policySettings = settings[policy.id] || [];
+                    const policyAssignments = assignments[policy.id] || [];
+                    const assignedGroups = policyAssignments.map(a => 
+                        a.target?.groupId || a.target?.['@odata.type'] || 'All Devices'
+                    );
+
+                    // For Settings Catalog
+                    if (policyType === 'settingsCatalog') {
+                        policySettings.forEach(setting => {
+                            const settingDef = setting.settingInstance;
+                            if (!settingDef) return;
+
+                            const settingId = settingDef['@odata.type'] + ':' + 
+                                (settingDef.settingDefinitionId || settingDef.settingInstanceTemplateReference?.settingInstanceTemplateId || 'unknown');
+                            
+                            const value = extractSettingValue(settingDef);
+
+                            if (!settingsMap.has(settingId)) {
+                                settingsMap.set(settingId, []);
+                            }
+                            settingsMap.get(settingId).push({
+                                policy,
+                                policyType,
+                                settingId,
+                                settingName: settingDef.settingDefinitionId || settingId,
+                                value,
+                                valueDisplay: formatSettingValue(value),
+                                assignments: policyAssignments,
+                                assignedGroups
+                            });
+                        });
+                    }
+
+                    // For Device Configuration
+                    if (policyType === 'deviceConfiguration') {
+                        const configSettings = extractDeviceConfigSettings(policy);
+                        configSettings.forEach(({ key, value }) => {
+                            const settingId = `deviceConfig:${key}`;
+                            
+                            if (!settingsMap.has(settingId)) {
+                                settingsMap.set(settingId, []);
+                            }
+                            settingsMap.get(settingId).push({
+                                policy,
+                                policyType,
+                                settingId,
+                                settingName: key,
+                                value,
+                                valueDisplay: formatSettingValue(value),
+                                assignments: policyAssignments,
+                                assignedGroups
+                            });
+                        });
+                    }
+
+                    // For Endpoint Security
+                    if (policyType === 'endpointSecurity') {
+                        policySettings.forEach(setting => {
+                            const settingId = `endpointSecurity:${setting.definitionId || setting.id}`;
+                            const value = setting.value || setting.valueJson;
+
+                            if (!settingsMap.has(settingId)) {
+                                settingsMap.set(settingId, []);
+                            }
+                            settingsMap.get(settingId).push({
+                                policy,
+                                policyType,
+                                settingId,
+                                settingName: setting.definitionId || setting.id,
+                                value,
+                                valueDisplay: formatSettingValue(value),
+                                assignments: policyAssignments,
+                                assignedGroups
+                            });
+                        });
+                    }
+
+                    // For Admin Templates
+                    if (policyType === 'adminTemplates') {
+                        policySettings.forEach(setting => {
+                            const settingId = `adminTemplate:${setting.definitionId || setting.id}`;
+                            
+                            if (!settingsMap.has(settingId)) {
+                                settingsMap.set(settingId, []);
+                            }
+                            settingsMap.get(settingId).push({
+                                policy,
+                                policyType,
+                                settingId,
+                                settingName: setting.definitionId || 'GPO Setting',
+                                value: setting.enabled,
+                                valueDisplay: setting.enabled ? 'Enabled' : 'Disabled',
+                                assignments: policyAssignments,
+                                assignedGroups
+                            });
+                        });
+                    }
+                });
+            });
+
+            // Find conflicts (same setting with different values AND overlapping assignments)
+            settingsMap.forEach((instances, settingId) => {
+                if (instances.length < 2) return;
+
+                // Group by value
+                const valueGroups = new Map();
+                instances.forEach(instance => {
+                    const valueKey = JSON.stringify(instance.value);
+                    if (!valueGroups.has(valueKey)) {
+                        valueGroups.set(valueKey, []);
+                    }
+                    valueGroups.get(valueKey).push(instance);
+                });
+
+                // If there are different values, we have potential conflicts
+                if (valueGroups.size > 1) {
+                    const allInstances = Array.from(valueGroups.values()).flat();
+                    
+                    // Check for overlapping assignments
+                    const hasOverlap = checkAssignmentOverlap(allInstances);
+                    
+                    if (hasOverlap) {
+                        const severity = determineSeverity(allInstances);
+                        conflicts.push({
+                            id: settingId,
+                            settingName: cleanSettingName(allInstances[0].settingName),
+                            instances: allInstances,
+                            severity,
+                            resolution: generateResolution(allInstances)
+                        });
+                    }
+                }
+            });
+
+            return conflicts.sort((a, b) => {
+                const severityOrder = { high: 0, medium: 1, low: 2 };
+                return severityOrder[a.severity] - severityOrder[b.severity];
+            });
+        };
+
+        const extractSettingValue = (settingDef) => {
+            if (settingDef.choiceSettingValue) {
+                return settingDef.choiceSettingValue.value;
+            }
+            if (settingDef.simpleSettingValue) {
+                return settingDef.simpleSettingValue.value;
+            }
+            if (settingDef.choiceSettingCollectionValue) {
+                return settingDef.choiceSettingCollectionValue.map(v => v.value);
+            }
+            if (settingDef.simpleSettingCollectionValue) {
+                return settingDef.simpleSettingCollectionValue.map(v => v.value);
+            }
+            if (settingDef.groupSettingCollectionValue) {
+                return 'Group Collection';
+            }
+            return settingDef.value || settingDef;
+        };
+
+        const extractDeviceConfigSettings = (policy) => {
+            const settings = [];
+            const skipKeys = ['id', 'displayName', 'description', 'version', 'createdDateTime', 
+                'lastModifiedDateTime', '@odata.type', 'supportsScopeTags', 'deviceManagementApplicabilityRuleOsEdition',
+                'deviceManagementApplicabilityRuleOsVersion', 'deviceManagementApplicabilityRuleDeviceMode',
+                'roleScopeTagIds'];
+            
+            Object.entries(policy).forEach(([key, value]) => {
+                if (!skipKeys.includes(key) && value !== null && value !== undefined) {
+                    settings.push({ key, value });
+                }
+            });
+            return settings;
+        };
+
+        const formatSettingValue = (value) => {
+            if (value === null || value === undefined) return 'Not configured';
+            if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
+            if (typeof value === 'object') return JSON.stringify(value, null, 2);
+            return String(value);
+        };
+
+        const cleanSettingName = (name) => {
+            if (!name) return 'Unknown Setting';
+            // Clean up long setting definition IDs
+            const parts = name.split('_');
+            if (parts.length > 2) {
+                return parts.slice(-2).join(' ').replace(/([A-Z])/g, ' $1').trim();
+            }
+            return name.replace(/([A-Z])/g, ' $1').trim();
+        };
+
+        const checkAssignmentOverlap = (instances) => {
+            const allGroups = instances.flatMap(i => i.assignedGroups);
+            
+            // Check for "All Devices" or "All Users" targeting
+            if (allGroups.some(g => g.includes('allDevices') || g.includes('allUsers'))) {
+                return true;
+            }
+
+            // Check for same group targeting
+            const groupSet = new Set();
+            for (const group of allGroups) {
+                if (groupSet.has(group)) return true;
+                groupSet.add(group);
+            }
+
+            // For simplicity, assume overlap if we can't determine specific groups
+            return instances.length > 1;
+        };
+
+        const determineSeverity = (instances) => {
+            const policyTypes = new Set(instances.map(i => i.policyType));
+            
+            // High: Same setting in different policy types (e.g., Settings Catalog vs Device Config)
+            if (policyTypes.size > 1) return 'high';
+            
+            // High: Security-related settings
+            const settingName = instances[0].settingName.toLowerCase();
+            if (settingName.includes('firewall') || settingName.includes('bitlocker') || 
+                settingName.includes('defender') || settingName.includes('password') ||
+                settingName.includes('encryption') || settingName.includes('security')) {
+                return 'high';
+            }
+
+            // Medium: Different values for same setting
+            const values = new Set(instances.map(i => JSON.stringify(i.value)));
+            if (values.size > 1) return 'medium';
+
+            return 'low';
+        };
+
+        const generateResolution = (instances) => {
+            const policyTypes = new Set(instances.map(i => i.policyType));
+            const steps = [];
+
+            if (policyTypes.size > 1) {
+                steps.push('Consolidate this setting into a single policy type (preferably Settings Catalog for modern management)');
+                steps.push('Remove the duplicate setting from legacy policy types');
+            }
+
+            steps.push('Review the assignment groups to ensure only necessary devices are targeted');
+            steps.push('Determine the correct value based on your security requirements');
+            
+            const winner = instances.find(i => i.policyType === 'settingsCatalog') || instances[0];
+            steps.push(`Consider using the value "${winner.valueDisplay}" from "${winner.policy.displayName || winner.policy.name}"`);
+
+            return steps;
+        };
+
+        // ============================================
+        // COMPONENTS
+        // ============================================
+        const Header = ({ user, onLogout }) => (
+            <header className="header">
+                <div className="header-content">
+                    <div className="logo-section">
+                        <div className="logo-icon">
+                            <Icons.Shield />
+                        </div>
+                        <div className="logo-text">
+                            <h1>Intune Policy Conflict Analyzer</h1>
+                            <span>Policy Management Tool</span>
+                        </div>
+                    </div>
+                    {user && (
+                        <div className="header-actions">
+                            <div className="user-badge">
+                                <div className="user-avatar">
+                                    {(user.name || user.upn || 'U')[0].toUpperCase()}
+                                </div>
+                                <span>{user.name || user.upn || 'User'}</span>
+                            </div>
+                            <button className="btn btn-secondary btn-icon" onClick={onLogout} title="Sign out">
+                                <Icons.LogOut />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </header>
+        );
+
+        const AuthScreen = ({ deviceCode, isAuthenticating, onStartAuth }) => (
+            <div className="auth-container">
+                <div className="auth-card fade-in">
+                    <div className="auth-icon">
+                        <Icons.Shield />
+                    </div>
+                    <h2>Sign in to Analyze Policies</h2>
+                    <p>Connect to Microsoft Graph to fetch and analyze your Intune policies for conflicts.</p>
+
+                    {!deviceCode && !isAuthenticating && (
+                        <button className="btn btn-primary" onClick={onStartAuth}>
+                            Start Device Code Flow
+                        </button>
+                    )}
+
+                    {deviceCode && (
+                        <>
+                            <div className="device-code-display">
+                                <div className="device-code-label">Enter this code</div>
+                                <div className="device-code">{deviceCode.user_code}</div>
+                            </div>
+                            <a 
+                                href="https://microsoft.com/devicelogin" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="auth-link"
+                            >
+                                Open microsoft.com/devicelogin <Icons.ExternalLink />
+                            </a>
+                            <div className="auth-status">
+                                <div className="auth-spinner"></div>
+                                Waiting for authentication...
+                            </div>
+                        </>
+                    )}
+
+                    {isAuthenticating && !deviceCode && (
+                        <div className="auth-status">
+                            <div className="auth-spinner"></div>
+                            Initializing...
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+
+        const LoadingScreen = ({ progress, status }) => (
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <h3>Analyzing Policies</h3>
+                <p style={{ color: 'var(--text-secondary)' }}>{status}</p>
+                <div className="loading-progress">
+                    <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                    </div>
+                    <div className="progress-text">{Math.round(progress)}% complete</div>
+                </div>
+            </div>
+        );
+
+        const StatsGrid = ({ stats }) => (
+            <div className="stats-grid">
+                <div className="stat-card fade-in" style={{ animationDelay: '0ms' }}>
+                    <div className="stat-label">Total Policies</div>
+                    <div className="stat-value policies">{stats.totalPolicies}</div>
+                </div>
+                <div className="stat-card fade-in" style={{ animationDelay: '50ms' }}>
+                    <div className="stat-label">Conflicts Found</div>
+                    <div className="stat-value conflicts">{stats.conflicts}</div>
+                </div>
+                <div className="stat-card fade-in" style={{ animationDelay: '100ms' }}>
+                    <div className="stat-label">High Severity</div>
+                    <div className="stat-value conflicts">{stats.highSeverity}</div>
+                </div>
+                <div className="stat-card fade-in" style={{ animationDelay: '150ms' }}>
+                    <div className="stat-label">Policies Without Conflicts</div>
+                    <div className="stat-value clean">{stats.cleanPolicies}</div>
+                </div>
+            </div>
+        );
+
+        const ConflictCard = ({ conflict, expanded, onToggle }) => (
+            <div className={`conflict-card severity-${conflict.severity} ${expanded ? 'expanded' : ''}`}>
+                <div className="conflict-header" onClick={onToggle}>
+                    <div className="conflict-info">
+                        <div className="conflict-title">
+                            <span className="conflict-setting">{conflict.settingName}</span>
+                        </div>
+                        <div className="conflict-meta">
+                            <span className="conflict-meta-item">
+                                <Icons.Layers />
+                                {conflict.instances.length} policies
+                            </span>
+                            <span className="conflict-meta-item">
+                                <Icons.Users />
+                                {new Set(conflict.instances.flatMap(i => i.assignedGroups)).size} groups affected
+                            </span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <span className={`severity-badge ${conflict.severity}`}>
+                            {conflict.severity}
+                        </span>
+                        <span className="conflict-expand-icon">
+                            <Icons.ChevronDown />
+                        </span>
+                    </div>
+                </div>
+
+                {expanded && (
+                    <div className="conflict-details">
+                        <div className="conflict-details-inner">
+                            <div className="policy-comparison">
+                                {conflict.instances.map((instance, idx) => (
+                                    <div className="policy-item" key={idx}>
+                                        <div className="policy-item-header">
+                                            <span className={`policy-type-icon ${POLICY_TYPES[instance.policyType]?.icon || ''}`}>
+                                                {(POLICY_TYPES[instance.policyType]?.name || 'P')[0]}
+                                            </span>
+                                            <span>{instance.policy.displayName || instance.policy.name}</span>
+                                        </div>
+                                        <div className="policy-value">{instance.valueDisplay}</div>
+                                        <div className="policy-assignments">
+                                            <strong>Assignments:</strong>
+                                            <div>
+                                                {instance.assignedGroups.length > 0 ? (
+                                                    instance.assignedGroups.slice(0, 3).map((group, gIdx) => (
+                                                        <span className="assignment-tag" key={gIdx}>
+                                                            {group.includes('allDevices') ? 'All Devices' : 
+                                                             group.includes('allUsers') ? 'All Users' : 
+                                                             group.substring(0, 8) + '...'}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="assignment-tag">No assignments</span>
+                                                )}
+                                                {instance.assignedGroups.length > 3 && (
+                                                    <span className="assignment-tag">+{instance.assignedGroups.length - 3} more</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="resolution-section">
+                                <div className="resolution-title">
+                                    <Icons.Lightbulb />
+                                    Recommended Resolution
+                                </div>
+                                <div className="resolution-steps">
+                                    <ol>
+                                        {conflict.resolution.map((step, idx) => (
+                                            <li key={idx}>{step}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+
+        const ConflictsList = ({ conflicts, filter, searchQuery }) => {
+            const [expandedId, setExpandedId] = useState(null);
+
+            const filteredConflicts = conflicts.filter(c => {
+                if (filter !== 'all' && c.severity !== filter) return false;
+                if (searchQuery) {
+                    const query = searchQuery.toLowerCase();
+                    return c.settingName.toLowerCase().includes(query) ||
+                        c.instances.some(i => 
+                            (i.policy.displayName || i.policy.name || '').toLowerCase().includes(query)
+                        );
+                }
+                return true;
+            });
+
+            if (filteredConflicts.length === 0) {
+                return (
+                    <div className="empty-state">
+                        <div className="empty-icon">
+                            <Icons.Check />
+                        </div>
+                        <h3>No Conflicts Found</h3>
+                        <p>
+                            {conflicts.length === 0 
+                                ? 'Great news! No policy conflicts were detected in your tenant.'
+                                : 'No conflicts match your current filter criteria.'}
+                        </p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="conflicts-list">
+                    {filteredConflicts.map((conflict, idx) => (
+                        <ConflictCard
+                            key={conflict.id}
+                            conflict={conflict}
+                            expanded={expandedId === conflict.id}
+                            onToggle={() => setExpandedId(expandedId === conflict.id ? null : conflict.id)}
+                        />
+                    ))}
+                </div>
+            );
+        };
+
+        const PolicyTable = ({ policies, conflicts, policyType }) => {
+            const conflictingPolicyIds = new Set(
+                conflicts.flatMap(c => c.instances.map(i => i.policy.id))
+            );
+
+            const policyList = policies[policyType] || [];
+
+            if (policyList.length === 0) {
+                return (
+                    <div className="empty-state">
+                        <div className="empty-icon">📋</div>
+                        <h3>No Policies Found</h3>
+                        <p>No {POLICY_TYPES[policyType]?.name || policyType} policies exist in your tenant.</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="policy-table">
+                    <div className="policy-table-header">
+                        <div>Policy Name</div>
+                        <div>Type</div>
+                        <div>Platform</div>
+                        <div>Status</div>
+                        <div>Conflicts</div>
+                    </div>
+                    {policyList.map((policy, idx) => {
+                        const hasConflict = conflictingPolicyIds.has(policy.id);
+                        const conflictCount = conflicts.filter(c => 
+                            c.instances.some(i => i.policy.id === policy.id)
+                        ).length;
+
+                        return (
+                            <div className="policy-table-row" key={policy.id || idx}>
+                                <div className="policy-name">
+                                    <span className={`policy-type-icon ${POLICY_TYPES[policyType]?.icon || ''}`}>
+                                        {(POLICY_TYPES[policyType]?.name || 'P')[0]}
+                                    </span>
+                                    {policy.displayName || policy.name || 'Unnamed Policy'}
+                                </div>
+                                <div>{POLICY_TYPES[policyType]?.name || policyType}</div>
+                                <div>{policy.platforms || policy.platformType || 'All'}</div>
+                                <div>
+                                    <span className={`policy-status ${hasConflict ? 'has-conflicts' : 'clean'}`}>
+                                        {hasConflict ? (
+                                            <><Icons.AlertTriangle /> Conflicts</>
+                                        ) : (
+                                            <><Icons.Check /> Clean</>
+                                        )}
+                                    </span>
+                                </div>
+                                <div>{conflictCount > 0 ? conflictCount : '-'}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        const Dashboard = ({ policies, conflicts, onRefresh, isRefreshing }) => {
+            const [activeTab, setActiveTab] = useState('conflicts');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [severityFilter, setSeverityFilter] = useState('all');
+
+            const totalPolicies = Object.values(policies).reduce((sum, arr) => sum + arr.length, 0);
+            const conflictingPolicyIds = new Set(conflicts.flatMap(c => c.instances.map(i => i.policy.id)));
+            
+            const stats = {
+                totalPolicies,
+                conflicts: conflicts.length,
+                highSeverity: conflicts.filter(c => c.severity === 'high').length,
+                cleanPolicies: totalPolicies - conflictingPolicyIds.size
+            };
+
+            const tabs = [
+                { id: 'conflicts', label: 'Conflicts', badge: conflicts.length, badgeClass: conflicts.length > 0 ? 'conflicts' : '' },
+                { id: 'settingsCatalog', label: 'Settings Catalog', badge: policies.settingsCatalog?.length || 0 },
+                { id: 'deviceConfiguration', label: 'Device Config', badge: policies.deviceConfiguration?.length || 0 },
+                { id: 'endpointSecurity', label: 'Endpoint Security', badge: policies.endpointSecurity?.length || 0 },
+                { id: 'compliance', label: 'Compliance', badge: policies.compliance?.length || 0 },
+                { id: 'adminTemplates', label: 'Admin Templates', badge: policies.adminTemplates?.length || 0 },
+                { id: 'scripts', label: 'Scripts', badge: policies.scripts?.length || 0 }
+            ];
+
+            const exportReport = () => {
+                const report = {
+                    generatedAt: new Date().toISOString(),
+                    summary: stats,
+                    conflicts: conflicts.map(c => ({
+                        settingName: c.settingName,
+                        severity: c.severity,
+                        policies: c.instances.map(i => ({
+                            name: i.policy.displayName || i.policy.name,
+                            type: i.policyType,
+                            value: i.valueDisplay
+                        })),
+                        resolution: c.resolution
+                    }))
+                };
+
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `intune-conflicts-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            return (
+                <div className="fade-in">
+                    <div className="dashboard-header">
+                        <div className="dashboard-title">
+                            <h2>Policy Analysis Results</h2>
+                            <p>Review detected conflicts and their recommended resolutions</p>
+                        </div>
+                        <div className="dashboard-actions">
+                            <button className="btn btn-secondary" onClick={exportReport}>
+                                <Icons.Download /> Export Report
+                            </button>
+                            <button className="btn btn-primary" onClick={onRefresh} disabled={isRefreshing}>
+                                <Icons.RefreshCw /> {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <StatsGrid stats={stats} />
+
+                    <div className="tabs-container">
+                        <div className="tabs">
+                            {tabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+                                    onClick={() => setActiveTab(tab.id)}
+                                >
+                                    {tab.label}
+                                    <span className={`tab-badge ${tab.badgeClass || ''}`}>{tab.badge}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {activeTab === 'conflicts' && (
+                        <>
+                            <div className="filter-bar">
+                                <div className="search-wrapper">
+                                    <span className="search-icon"><Icons.Search /></span>
+                                    <input
+                                        type="text"
+                                        className="search-input"
+                                        placeholder="Search conflicts by setting name or policy..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                <select
+                                    className="filter-select"
+                                    value={severityFilter}
+                                    onChange={(e) => setSeverityFilter(e.target.value)}
+                                >
+                                    <option value="all">All Severities</option>
+                                    <option value="high">High Only</option>
+                                    <option value="medium">Medium Only</option>
+                                    <option value="low">Low Only</option>
+                                </select>
+                            </div>
+                            <ConflictsList 
+                                conflicts={conflicts} 
+                                filter={severityFilter}
+                                searchQuery={searchQuery}
+                            />
+                        </>
+                    )}
+
+                    {activeTab !== 'conflicts' && (
+                        <PolicyTable 
+                            policies={policies} 
+                            conflicts={conflicts}
+                            policyType={activeTab}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 5000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            return (
+                <div className={`toast ${type}`}>
+                    <div className="toast-icon">
+                        {type === 'success' ? '✓' : '!'}
+                    </div>
+                    <span>{message}</span>
+                </div>
+            );
+        };
+
+        // ============================================
+        // MAIN APP
+        // ============================================
+        const App = () => {
+            const auth = useAuth();
+            const { fetchGraph, fetchAllPages } = useGraphApi(auth.getValidToken);
+            
+            const [policies, setPolicies] = useState({});
+            const [conflicts, setConflicts] = useState([]);
+            const [isLoading, setIsLoading] = useState(false);
+            const [loadingProgress, setLoadingProgress] = useState(0);
+            const [loadingStatus, setLoadingStatus] = useState('');
+            const [toasts, setToasts] = useState([]);
+
+            const addToast = (message, type = 'success') => {
+                const id = Date.now();
+                setToasts(prev => [...prev, { id, message, type }]);
+            };
+
+            const removeToast = (id) => {
+                setToasts(prev => prev.filter(t => t.id !== id));
+            };
+
+            const fetchPolicies = useCallback(async () => {
+                setIsLoading(true);
+                setLoadingProgress(0);
+                
+                const allPolicies = {};
+                const allAssignments = {};
+                const allSettings = {};
+
+                try {
+                    const policyTypes = Object.entries(POLICY_TYPES);
+                    const totalSteps = policyTypes.length * 3; // fetch, assignments, settings
+                    let currentStep = 0;
+
+                    for (const [key, config] of policyTypes) {
+                        // Fetch policies
+                        setLoadingStatus(`Fetching ${config.name}...`);
+                        try {
+                            let fetchedPolicies = await fetchAllPages(config.endpoint);
+                            
+                            if (config.filter) {
+                                fetchedPolicies = fetchedPolicies.filter(config.filter);
+                            }
+
+                            allPolicies[key] = fetchedPolicies;
+                            currentStep++;
+                            setLoadingProgress((currentStep / totalSteps) * 100);
+
+                            // Fetch assignments
+                            if (config.assignmentsEndpoint) {
+                                setLoadingStatus(`Fetching ${config.name} assignments...`);
+                                for (const policy of fetchedPolicies) {
+                                    try {
+                                        const assignments = await fetchGraph(config.assignmentsEndpoint(policy.id));
+                                        allAssignments[policy.id] = assignments.value || [];
+                                    } catch (e) {
+                                        allAssignments[policy.id] = [];
+                                    }
+                                }
+                            }
+                            currentStep++;
+                            setLoadingProgress((currentStep / totalSteps) * 100);
+
+                            // Fetch settings
+                            const settingsEndpoint = config.settingsEndpoint || config.valuesEndpoint;
+                            if (settingsEndpoint) {
+                                setLoadingStatus(`Fetching ${config.name} settings...`);
+                                for (const policy of fetchedPolicies) {
+                                    try {
+                                        const settings = await fetchGraph(settingsEndpoint(policy.id));
+                                        allSettings[policy.id] = settings.value || [];
+                                    } catch (e) {
+                                        allSettings[policy.id] = [];
+                                    }
+                                }
+                            }
+                            currentStep++;
+                            setLoadingProgress((currentStep / totalSteps) * 100);
+
+                        } catch (e) {
+                            console.warn(`Error fetching ${config.name}:`, e);
+                            allPolicies[key] = [];
+                            currentStep += 3;
+                            setLoadingProgress((currentStep / totalSteps) * 100);
+                        }
+                    }
+
+                    // Analyze conflicts
+                    setLoadingStatus('Analyzing conflicts...');
+                    const detectedConflicts = analyzeConflicts(allPolicies, allAssignments, allSettings);
+
+                    setPolicies(allPolicies);
+                    setConflicts(detectedConflicts);
+
+                    const totalPolicies = Object.values(allPolicies).reduce((sum, arr) => sum + arr.length, 0);
+                    addToast(`Analyzed ${totalPolicies} policies, found ${detectedConflicts.length} conflicts`, 
+                        detectedConflicts.length > 0 ? 'error' : 'success');
+
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                    addToast(`Error: ${error.message}`, 'error');
+                } finally {
+                    setIsLoading(false);
+                }
+            }, [fetchGraph, fetchAllPages]);
+
+            // Auto-fetch on auth
+            useEffect(() => {
+                if (auth.isAuthenticated && Object.keys(policies).length === 0 && !isLoading) {
+                    fetchPolicies();
+                }
+            }, [auth.isAuthenticated]);
+
+            return (
+                <div className="app-container">
+                    <Header user={auth.user} onLogout={auth.logout} />
+                    
+                    <main className="main-content">
+                        {!auth.isAuthenticated ? (
+                            <AuthScreen
+                                deviceCode={auth.deviceCode}
+                                isAuthenticating={auth.isAuthenticating}
+                                onStartAuth={auth.startDeviceCodeFlow}
+                            />
+                        ) : isLoading ? (
+                            <LoadingScreen progress={loadingProgress} status={loadingStatus} />
+                        ) : (
+                            <Dashboard
+                                policies={policies}
+                                conflicts={conflicts}
+                                onRefresh={fetchPolicies}
+                                isRefreshing={isLoading}
+                            />
+                        )}
+                    </main>
+
+                    <div className="toast-container">
+                        {toasts.map(toast => (
+                            <Toast
+                                key={toast.id}
+                                message={toast.message}
+                                type={toast.type}
+                                onClose={() => removeToast(toast.id)}
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Render
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
